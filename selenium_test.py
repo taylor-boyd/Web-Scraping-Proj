@@ -62,6 +62,26 @@ def find_expiration():
 
     return expiration
 
+# reformat helper function
+def month_reformat(exp_date):
+    months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+    index = 1
+    for m in months:
+        if m in exp_date:
+            exp_date = exp_date.replace(m,str(index))
+        index += 1
+    return exp_date
+
+# reformat helper function
+def day_reformat(exp_date):
+    days = ['01-','02-','03-','04-','05-','06-','07-','08-','09-']
+    index = 1
+    for d in days:
+        if d in exp_date:
+            replacement = str(index) + '-'
+            exp_date = exp_date.replace(d,replacement)
+    return exp_date
+
 # if results table is displayed
 if results.is_displayed():
     # look through 'Business name' column and select row with best match
@@ -90,8 +110,6 @@ if results.is_displayed():
 
         # if an expiration date was found
         if len(expirations) > 0:
-            # output them all or compare them all to input
-            # how to compare jun-30-2024 to 6/30/2024? authomatically change format ig
             for exp in expirations:
                 first_val = exp[0]
                 for e in exp:
@@ -99,8 +117,8 @@ if results.is_displayed():
                         output[2] = "exp date unclear"
                 if output[2] != "exp date unclear":
                     first_val = first_val.replace('-','/')
-                    if 'jun' in first_val: # create funcion for this also need to replace '08' with '8' and so on
-                        first_val = first_val.replace('Jun','6')
+                    first_val = month_reformat(first_val)
+                    first_val = day_reformat(first_val)
                     if first_val != output[2]:
                         output[2] = first_val
         else:
@@ -110,12 +128,6 @@ else:
     output[2] = "license not found"
     
 print("Output: " + output[0] + " " + output[1] + " " + output[2])
-
-# how to hit return
-#search_bar.send_keys(Keys.RETURN)
-
-# printing the content of entire page
-#print(driver.page_source)
   
 # closing the driver
 driver.close()
