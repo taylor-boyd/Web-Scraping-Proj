@@ -51,18 +51,22 @@ def find_expiration(customer):
     expiration = []
 
     #endorsements = driver.find_elements(By.XPATH,"//*[@id='Dc-p1']/tbody")
-    endorsements = driver.find_elements(By.CSS_SELECTOR,"[aria-label='Endorsements']")
-    
-    for e in endorsements[1]:
-        print("element: " + e.text)
-        #rows = x.find_elements(By.XPATH,"tr")
-        #print(len(rows))
-        #for row in rows:
-        #    col = row.find_elements(By.TAG_NAME,"td")
-        #    if col[1].text == customer[6]: # if license number matches, add expiration
-        #        expiration.append(col[5].text)   
-        #        print(col[5].text)
-        #        print(row.text)
+    endorsement_table = driver.find_elements(By.CSS_SELECTOR,"[aria-label='Endorsements']")
+    e2 = WebElement
+    for e in endorsement_table:
+        if len(e.text) > 5:
+            e2 = e
+    results = e2.find_elements(By.TAG_NAME,"tr")
+
+    index = 0
+    for r in results:
+        if index > 0:
+            temp = r.text
+            row = temp.split()
+            if customer[6] in row:
+                length = len(row)
+                expiration.append(row[length-2])
+        index += 1
 
     return expiration
 
@@ -95,9 +99,6 @@ for customer in entries:
         license_no = wait.until(EC.element_to_be_clickable((By.ID,"Dc-t")))
         license_no.send_keys(int(customer[6])) # license num
         license_no.send_keys(u'\ue007')
-
-        # test
-        print(customer[1])
 
         # wait for results to appear
         time.sleep(5)
@@ -135,7 +136,6 @@ for customer in entries:
 
                 # if an expiration date was found
                 if len(expirations) > 0:
-                    print(expirations)
                     for exp in expirations:
                         first_val = exp[0]
                         for e in exp:
