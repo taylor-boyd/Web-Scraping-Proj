@@ -7,6 +7,20 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.remote.webelement import WebElement
 import time
 import difflib
+import csv
+ 
+# opening the CSV file
+with open("/Users/TaylorBoyd/OneDrive - Maletis Beverage/Licensing/wa_june_expiring_licenses.csv",'r') as file:
+   
+  # reading the CSV file
+  csvFile = csv.reader(file)
+  entries = []
+  temp = []
+  for row in csvFile:
+      temp = row
+      entries.append(temp)
+
+print(entries[1])
 
 customer = ["Kalama Shopping Center","354414","6/30/2023"]
 output = [customer[0],customer[1],customer[2]]
