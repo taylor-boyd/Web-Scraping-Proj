@@ -21,10 +21,17 @@ import difflib
 import csv
 from pathlib import Path
 
+### If website is changed, here's where code may need to be changed:
+### Lines 114-134 initial setup; opening up website, clicking 'business lookup' button, and clicking Recaptcha button
+### Lines 233-241, 252-261, 271-273 is where the License Number field is clicked and text is entered (or deleted); also where a subsequent 'Results Table' is searched for
+### Lines 185-194 if a results table is found in above lines ^ then this is where the table is parsed in search of a matching customer name
+### Lines 143-157 looks through 'Endorsements' Table for license expiration date on same line as license number
+
 class MainWindow(QWidget):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        # GUI setup
         self.setWindowTitle('WA License Checking Tool')
         self.setGeometry(100, 100, 300, 150)
 
@@ -48,6 +55,7 @@ class MainWindow(QWidget):
       
         self.show()
 
+    # helper function for opening file selection
     def open_file_dialog(self):
         filename, ok = QFileDialog.getOpenFileName(
             self,
@@ -59,6 +67,7 @@ class MainWindow(QWidget):
             path = Path(filename)
             self.filename_edit.setText(str(path))
 
+    # function for checking licenses
     def open_license_checker(self):
         input_file = self.filename_edit.text()
         if '.csv' in input_file:
@@ -76,6 +85,7 @@ class MainWindow(QWidget):
                         temp = row
                         entries.append(temp)
                 
+                # helper function for checking that columns are correct in input file
                 def check_columns(input_headers, missing, misplaced, length):
                     col_headers = ['Customer ID', 'Customer Name', 'Sales Rep', 'Shipping Address', 'Product Group', 'Distribution Area', 'State License Num', 'License Exp Date']
                     for c in col_headers:
@@ -97,9 +107,11 @@ class MainWindow(QWidget):
                 misplaced = []
                 length = "Correct"
                 missing,misplaced,length = check_columns(entries[0],missing,misplaced, length)
+
+                # if input file is correctly formatted, then proceed; else, output a message giving some details on what's wrong with input file
                 if (len(missing) < 1 and len(misplaced) < 1 and length == 'Correct'):
                     
-                    # initial setup 
+                    # initial setup of Google Chrome webdriver
                     chrome_options = Options()
                     chrome_options.add_experimental_option("detach", True)
                     driver = webdriver.Chrome() # options=chrome_options
@@ -111,7 +123,7 @@ class MainWindow(QWidget):
                     # store first window
                     window_before = driver.window_handles[0]
 
-                    # find 'Business Lookup' look and click
+                    # find 'Business Lookup' button and click
                     business_lookup = wait.until(EC.element_to_be_clickable((By.XPATH,"//*[@id='l_Dd-8-1']")))
                     business_lookup.click()
 
@@ -129,7 +141,6 @@ class MainWindow(QWidget):
                     def find_expiration(customer):
                         expiration = []
 
-                        #endorsements = driver.find_elements(By.XPATH,"//*[@id='Dc-p1']/tbody")
                         endorsement_table = driver.find_elements(By.CSS_SELECTOR,"[aria-label='Endorsements']")
                         e2 = WebElement
                         for e in endorsement_table:
@@ -218,7 +229,7 @@ class MainWindow(QWidget):
                     output = []
 
                     for customer in entries:
-                        if index > 0:
+                        if index > 0:         
                             # find 'License #' text box, click, enter license_no, hit 'Enter'
                             license_no = wait.until(EC.element_to_be_clickable((By.ID,"Dc-t")))
                             license_no.send_keys(int(customer[6])) # license num
@@ -279,6 +290,7 @@ class MainWindow(QWidget):
                     
                     # closing the driver
                     driver.close()
+
                     QMessageBox.about(self, 'License Check Complete', "The check has completed and the results have been written to: " + str(output_file))
 
                 # else output message detailing missing or misplaced columns
