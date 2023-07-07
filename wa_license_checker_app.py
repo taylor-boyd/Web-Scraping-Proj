@@ -22,10 +22,10 @@ import csv
 from pathlib import Path
 
 ### If website is changed, here's where code may need to be changed:
-### Lines 114-134 initial setup; opening up website, clicking 'business lookup' button, and clicking Recaptcha button
-### Lines 233-241, 252-261, 271-273 is where the License Number field is clicked and text is entered (or deleted); also where a subsequent 'Results Table' is searched for
-### Lines 185-194 if a results table is found in above lines ^ then this is where the table is parsed in search of a matching customer name
-### Lines 143-157 looks through 'Endorsements' Table for license expiration date on same line as license number
+### Lines 115-135 initial setup; opening up website, clicking 'business lookup' button, and clicking Recaptcha button
+### Lines 234-242, 250-259, 269-271 is where the License Number field is clicked and text is entered (or deleted); also where a subsequent 'Results Table' is searched for
+### Lines 163-209 if a results table is found in above lines ^ then this is where the table is parsed in search of a matching customer name
+### and then the 'Endorsements' Table is searched for license expiration date on same line as license number
 
 class MainWindow(QWidget):
     def __init__(self, *args, **kwargs):
@@ -137,29 +137,6 @@ class MainWindow(QWidget):
                     # wait for user to select recaptcha photos
                     time.sleep(25)
 
-                    # helper function
-                    def find_expiration(customer):
-                        expiration = []
-
-                        endorsement_table = driver.find_elements(By.CSS_SELECTOR,"[aria-label='Endorsements']")
-                        e2 = WebElement
-                        for e in endorsement_table:
-                            if len(e.text) > 5:
-                                e2 = e
-                        results = e2.find_elements(By.TAG_NAME,"tr")
-
-                        index = 0
-                        for r in results:
-                            if index > 0:
-                                temp = r.text
-                                row = temp.split()
-                                if customer[6] in row:
-                                    length = len(row)
-                                    expiration.append(row[length-2])
-                            index += 1
-
-                        return expiration
-
                     # reformat helper function
                     def month_reformat(exp_date):
                         months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
@@ -199,10 +176,39 @@ class MainWindow(QWidget):
                             if len(best_match) > 0:
                                 for match in best_match:
                                     for col in cols:
+                                        print("col text: " + col[0].text)
+                                        print
+                                        print("match: " + match)
                                         if col[0].text == match:
                                             col[0].click()
                                             time.sleep(5)
-                                            expirations.append(find_expiration(customer)) # find expiration date(s)
+
+                                            endorsement_table = driver.find_elements(By.CSS_SELECTOR,"[aria-label='Endorsements']")
+                                            e2 = WebElement
+                                            for e in endorsement_table:
+                                                if len(e.text) > 5:
+                                                    e2 = e
+                                            results = e2.find_elements(By.TAG_NAME,"tr")
+
+                                            index = 0
+                                            for r in results:
+                                                if index > 0:
+                                                    temp = r.text
+                                                    row = temp.split()
+                                                    if customer[6] in row:
+                                                        length = len(row)
+                                                        exp = row[length-2]
+                                                        exp = exp.replace('-','/')
+                                                        exp = month_reformat(exp)
+                                                        exp = day_reformat(exp)
+                                                        expirations.append(exp)
+                                                        exp_num = exp.split('/')
+                                                        input_exp = customer[7].split('/')
+                                                        if exp_num[2] > input_exp[2] or (exp_num[0] > input_exp[0] and exp_num[2] == input_exp[2]) or exp == customer[7]:
+                                                            customer[7] = exp
+                                                            customer[8] = row[length-3] # add license status
+                                                index += 1
+
                                             driver.execute_script("window.history.go(-1)") # go back a page
                                             time.sleep(5)
                             else:
@@ -210,26 +216,23 @@ class MainWindow(QWidget):
 
                             # if an expiration date was found
                             if len(expirations) > 0:
+                                first_val = expirations[0]
                                 for exp in expirations:
-                                    first_val = exp[0]
-                                    for e in exp:
-                                        if e != first_val:
-                                            customer[7] = "exp date unclear"
-                                    if customer[7] != "exp date unclear":
-                                        first_val = first_val.replace('-','/')
-                                        first_val = month_reformat(first_val)
-                                        first_val = day_reformat(first_val)
-                                        if first_val != customer[7]:
-                                            customer[7] = first_val
-                            else:
+                                    if exp != first_val:
+                                        customer[7] = "exp date unclear"
+                            elif customer[7] != "business name not recognized":
                                 customer[7] = "exp date not found"
+
                         return customer
 
                     index = 0
                     output = []
 
+                    # for each customer in input file
                     for customer in entries:
-                        if index > 0:         
+                        if index > 0:   
+                            customer.append("")
+
                             # find 'License #' text box, click, enter license_no, hit 'Enter'
                             license_no = wait.until(EC.element_to_be_clickable((By.ID,"Dc-t")))
                             license_no.send_keys(int(customer[6])) # license num
@@ -244,10 +247,7 @@ class MainWindow(QWidget):
                             # if results table is displayed
                             if results.is_displayed():
                                 select_results(customer)
-                            else:
-                                customer[7] = "license not found"
-
-                            if customer[7] == "license not found":
+                            else: # encompass gets rid of leading zeros so if license not found, check again with leading zero added to license num just to make sure
                                 customer[6] = '0' + str(customer[6])
                                 # find 'License #' text box, click, delete what's in there
                                 license_no2 = wait.until(EC.element_to_be_clickable((By.ID,"Dc-t")))
@@ -275,6 +275,7 @@ class MainWindow(QWidget):
 
                             output.append(customer)
                         else:
+                            customer.append("License Status")
                             output.append(customer)
                         index += 1
 
