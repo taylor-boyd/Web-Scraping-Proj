@@ -23,8 +23,8 @@ from pathlib import Path
 
 ### If website is changed, here's where code may need to be changed:
 ### Lines 115-135 initial setup; opening up website, clicking 'business lookup' button, and clicking Recaptcha button
-### Lines 234-242, 250-259, 269-271 is where the License Number field is clicked and text is entered (or deleted); also where a subsequent 'Results Table' is searched for
-### Lines 163-209 if a results table is found in above lines ^ then this is where the table is parsed in search of a matching customer name
+### Lines 244-253, 261-270, 280-289 is where the License Number field is clicked and text is entered (or deleted); also where a subsequent 'Results Table' is searched for
+### Lines 163-219 if a results table is found in above lines ^ then this is where the table is parsed in search of a matching customer name
 ### and then the 'Endorsements' Table is searched for license expiration date on same line as license number
 
 class MainWindow(QWidget):
@@ -156,7 +156,7 @@ class MainWindow(QWidget):
                                 replacement = str(index) + '-'
                                 exp_date = exp_date.replace(d,replacement)
                         return exp_date
-
+                    
                     # looks through results table
                     def select_results(customer):
                         # look through 'Business name' column and select row with best match
@@ -172,47 +172,54 @@ class MainWindow(QWidget):
                             best_match = difflib.get_close_matches(customer[1].upper(),business_names,n=3,cutoff=0.5) # case sensitive 
                             expirations = []
                                 
-                            # if at least one match was found
-                            if len(best_match) > 0:
-                                for match in best_match:
-                                    for col in cols:
-                                        print("col text: " + col[0].text)
-                                        print
-                                        print("match: " + match)
-                                        if col[0].text == match:
-                                            col[0].click()
-                                            time.sleep(5)
+                        # if at least one match was found
+                        if len(best_match) > 0:
+                            for match in best_match:
+                                content = driver.find_elements(By.XPATH,"//*[@id='Dc-u1']/tbody") 
+                                for x in content:
+                                    rows = x.find_elements(By.TAG_NAME,"tr")
+                                    cols = []
+                                    for row in rows:
+                                        col = row.find_elements(By.TAG_NAME,"td")
+                                        cols.append(col)
+                                for col in cols:
+                                    if col[0].text == match:
+                                        col[0].click()
+                                        time.sleep(5)
 
-                                            endorsement_table = driver.find_elements(By.CSS_SELECTOR,"[aria-label='Endorsements']")
-                                            e2 = WebElement
-                                            for e in endorsement_table:
-                                                if len(e.text) > 5:
-                                                    e2 = e
-                                            results = e2.find_elements(By.TAG_NAME,"tr")
+                                        endorsement_table = driver.find_elements(By.CSS_SELECTOR,"[aria-label='Endorsements']")
+                                        e2 = WebElement
+                                        for e in endorsement_table:
+                                            if len(e.text) > 5:
+                                                e2 = e
+                                        results = e2.find_elements(By.TAG_NAME,"tr")
 
-                                            index = 0
-                                            for r in results:
-                                                if index > 0:
-                                                    temp = r.text
-                                                    row = temp.split()
-                                                    if customer[6] in row:
-                                                        length = len(row)
-                                                        exp = row[length-2]
-                                                        exp = exp.replace('-','/')
-                                                        exp = month_reformat(exp)
-                                                        exp = day_reformat(exp)
-                                                        expirations.append(exp)
-                                                        exp_num = exp.split('/')
-                                                        input_exp = customer[7].split('/')
-                                                        if exp_num[2] > input_exp[2] or (exp_num[0] > input_exp[0] and exp_num[2] == input_exp[2]) or exp == customer[7]:
-                                                            customer[7] = exp
-                                                            customer[8] = row[length-3] # add license status
-                                                index += 1
+                                        index = 0
+                                        for r in results:
+                                            if index > 0:
+                                                columns = r.find_elements(By.TAG_NAME,"td")
+                                                temp = r.text
+                                                row = temp.split()
+                                                if customer[6] == columns[1].text:
+                                                    exp = columns[5].text
+                                                    exp = exp.replace('-','/')
+                                                    exp = month_reformat(exp)
+                                                    exp = day_reformat(exp)
+                                                    expirations.append(exp)
+                                                    exp_num = exp.split('/')
+                                                    input_exp = customer[7].split('/')
+                                                    if len(input_exp[2]) < 3:
+                                                        input_exp[2] = '20' + input_exp[2]
+                                                    if exp_num[2] > input_exp[2] or (exp_num[0] > input_exp[0] and exp_num[2] == input_exp[2]) or exp == customer[7]:
+                                                        customer[7] = exp
+                                                        customer[8] = columns[4].text # add license status
+                                            index += 1
+                                        break
 
-                                            driver.execute_script("window.history.go(-1)") # go back a page
-                                            time.sleep(5)
-                            else:
-                                customer[7] = "business name not recognized"
+                                driver.execute_script("window.history.go(-1)") # go back a page
+                                time.sleep(5)
+                        else:
+                            customer[7] = "business name not recognized"
 
                             # if an expiration date was found
                             if len(expirations) > 0:
@@ -235,6 +242,7 @@ class MainWindow(QWidget):
 
                             # find 'License #' text box, click, enter license_no, hit 'Enter'
                             license_no = wait.until(EC.element_to_be_clickable((By.ID,"Dc-t")))
+                            license_no.clear()
                             license_no.send_keys(int(customer[6])) # license num
                             license_no.send_keys(u'\ue007')
 
@@ -247,7 +255,26 @@ class MainWindow(QWidget):
                             # if results table is displayed
                             if results.is_displayed():
                                 select_results(customer)
-                            else: # encompass gets rid of leading zeros so if license not found, check again with leading zero added to license num just to make sure
+                                if customer[7] == "business name not recognized":
+                                    customer[6] = '0' + str(customer[6])
+                                    # find 'License #' text box, click, delete what's in there
+                                    license_no2 = wait.until(EC.element_to_be_clickable((By.ID,"Dc-t")))
+                                    license_no2.send_keys(Keys.CONTROL,'a') # license num
+                                    license_no2.send_keys(Keys.BACKSPACE)
+                                    license_no2.send_keys(str(customer[6])) # license num
+                                    license_no2.send_keys(u'\ue007')
+                                    # wait for results to appear
+                                    time.sleep(5)
+
+                                    # results table
+                                    results = driver.find_element(By.XPATH,"//*[@id='fc_Dc-m1']")
+
+                                    # if results table is displayed
+                                    if results.is_displayed():
+                                        select_results(customer)
+                                    else:
+                                        customer[6] = int(str(customer[6])[1:])
+                            elif len(customer[6]) < 6: # encompass gets rid of leading zeros so if license not found, check again with leading zero added to license num just to make sure
                                 customer[6] = '0' + str(customer[6])
                                 # find 'License #' text box, click, delete what's in there
                                 license_no2 = wait.until(EC.element_to_be_clickable((By.ID,"Dc-t")))
@@ -267,11 +294,6 @@ class MainWindow(QWidget):
                                 else:
                                     customer[7] = "license not found"
                                     customer[6] = int(str(customer[6])[1:])
-
-                            # find 'License #' text box, click, delete what's in there
-                            license_no3 = wait.until(EC.element_to_be_clickable((By.ID,"Dc-t")))
-                            license_no3.send_keys(Keys.CONTROL,'a') # license num
-                            license_no3.send_keys(Keys.BACKSPACE)
 
                             output.append(customer)
                         else:
